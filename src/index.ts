@@ -3,7 +3,7 @@ import { WebUsbComInterface } from "./webUsbComInterface";
 
 let com: WebUsbComInterface;
 
-const consoleLength = 10000000;
+const consoleLength = 1000000;
 
 document.getElementById(
   "revision"
@@ -14,10 +14,11 @@ if (!(navigator as any).serial) {
 }
 
 let connectButton = document.getElementById("connect");
-connectButton.innerText = "Connect";
+let updateTimerId: NodeJS.Timeout;
 connectButton.onclick = async () => {
   if (com?.connected) {
     connectButton.innerText = "Connect";
+    clearInterval(updateTimerId);
     await com.close();
   } else {
     try {
@@ -25,16 +26,18 @@ connectButton.onclick = async () => {
       await com.open(null, {});
       com.setReceiveCallback(dataReceiveHandler);
       connectButton.innerText = "Disconnect";
+      updateTimerId = setInterval(updateConsole, 50);
     } catch (e) {
       console.error(e);
     }
   }
 };
 
-const console = document.getElementById("console");
+const hidConsole = document.getElementById("console");
+let recvLine = "";
 
 document.getElementById("clear").onclick = () => {
-  console.innerHTML = "";
+  hidConsole.innerHTML = "";
 };
 
 document.getElementById("save").onclick = () => {
@@ -49,23 +52,26 @@ document.getElementById("save").onclick = () => {
   )}${padd2(date.getSeconds())}.txt`;
 
   download.href = URL.createObjectURL(
-    new Blob([console.innerHTML], { type: "text/plain" })
+    new Blob([hidConsole.innerHTML], { type: "text/plain" })
   );
   download.click();
 };
 
-function dataReceiveHandler(msg: Uint8Array) {
-  const recvLine = new TextDecoder().decode(msg);
-
-  console.innerHTML = console.innerHTML + recvLine;
+function updateConsole() {
+  hidConsole.insertAdjacentText("beforeend", recvLine);
+  recvLine = "";
 
   if ((document.getElementById("autoscroll") as HTMLInputElement).checked) {
-    console.scrollTop = console.scrollHeight;
+    hidConsole.scrollTop = hidConsole.scrollHeight;
   }
 
-  if (console.innerHTML.length > consoleLength) {
-    console.innerHTML = console.innerHTML.slice(
-      console.innerHTML.length - consoleLength
+  if (hidConsole.innerHTML.length > consoleLength) {
+    hidConsole.innerHTML = hidConsole.innerHTML.slice(
+      hidConsole.innerHTML.length - consoleLength
     );
   }
+}
+
+function dataReceiveHandler(msg: Uint8Array) {
+  recvLine += new TextDecoder().decode(msg);
 }
